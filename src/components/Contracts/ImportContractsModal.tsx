@@ -4,6 +4,7 @@ import { X, Download, Upload, AlertCircle, CheckCircle, Loader2, FileSpreadsheet
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ImportContractsModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export default function ImportContractsModal({ isOpen, onClose, onImportComplete
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   if (!isOpen) return null;
 
@@ -570,7 +572,8 @@ export default function ImportContractsModal({ isOpen, onClose, onImportComplete
                   start_date: contract.data_inicio,
                   end_date: contract.data_fim,
                   status: contract.status,
-                  category: contract.categoria
+                  category: contract.categoria,
+                  created_by: user?.id
                 });
 
               if (insertError) {
