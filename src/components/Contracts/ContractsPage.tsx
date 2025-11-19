@@ -89,7 +89,7 @@ export default function ContractsPage() {
         endDate: contract.end_date,
         status: contract.status,
         category: contract.category,
-        responsibleUser: 'Sistema',
+        responsibleUser: contract.created_by || contract.user_id || '', // Usar o campo correto do banco
         createdAt: contract.created_at,
         updatedAt: contract.updated_at
       }));

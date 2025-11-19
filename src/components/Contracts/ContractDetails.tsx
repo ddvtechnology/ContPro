@@ -22,8 +22,8 @@ export default function ContractDetails({ isOpen, onClose, contract }: ContractD
   const [loadingAddendums, setLoadingAddendums] = React.useState(false);
   const [viewerOpen, setViewerOpen] = React.useState(false);
   const [selectedDoc, setSelectedDoc] = React.useState<any>(null);
+  const [responsibleUserName, setResponsibleUserName] = React.useState<string>('Carregando...');
   const { user } = useAuth();
-  const userName = user?.name || 'Usuário';
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -51,6 +51,25 @@ export default function ContractDetails({ isOpen, onClose, contract }: ContractD
           .order('date', { ascending: false });
         setAddendums(addendumsData || []);
         setLoadingAddendums(false);
+
+        // Buscar o display name do usuário que criou o contrato
+        if (contract.responsibleUser) {
+          try {
+            const { data: displayNameData, error: displayNameError } = await supabase
+              .rpc('get_user_display_name', { user_id: contract.responsibleUser });
+            
+            if (!displayNameError && displayNameData) {
+              setResponsibleUserName(displayNameData);
+            } else {
+              setResponsibleUserName('Usuário não encontrado');
+            }
+          } catch (error) {
+            console.error('Erro ao buscar responsável:', error);
+            setResponsibleUserName('Não disponível');
+          }
+        } else {
+          setResponsibleUserName('Não informado');
+        }
       } else {
         setDocuments([]);
         setAddendums([]);
@@ -187,7 +206,7 @@ export default function ContractDetails({ isOpen, onClose, contract }: ContractD
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-gray-400" />
                 <p className="text-xs sm:text-sm font-medium text-gray-600">Responsável:</p>
-                <p className="text-sm sm:text-base text-gray-900">{userName}</p>
+                <p className="text-sm sm:text-base text-gray-900">{responsibleUserName}</p>
               </div>
             </div>
           </div>

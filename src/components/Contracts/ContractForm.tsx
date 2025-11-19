@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { Contract } from '../../types';
 import { formatDateForInput, formatDateForDB, getCurrentDate } from '../../utils/dateUtils';
 import { formatCurrencyInput, parseCurrencyInput } from '../../utils/currencyUtils';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ContractFormProps {
   isOpen: boolean;
@@ -133,6 +134,8 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
     setError('');
 
     try {
+      const { user } = useAuth(); // Adicione isso no topo do componente se ainda não estiver
+      
       const contractData = {
         number: formData.number,
         object: formData.object,
@@ -141,7 +144,8 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
         start_date: formatDateForDB(formData.startDate),
         end_date: formatDateForDB(formData.endDate),
         status: formData.status,
-        category: formData.category
+        category: formData.category,
+        created_by: user?.id // Adicionar o ID do usuário que está criando
       };
 
       let contractId: string;
