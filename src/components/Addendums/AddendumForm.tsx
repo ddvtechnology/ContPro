@@ -80,16 +80,57 @@ export default function AddendumForm({ isOpen, onClose, onSave, addendum }: Adde
   };
 
   const uploadFileToStorage = async (file: File) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `addendums/${fileName}`;
+    // Usar o nome original do arquivo, sanitizado
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const originalName = file.name.replace(/\.[^/.]+$/, ''); // Remove extensão
+    
+    // Sanitizar o nome para evitar caracteres especiais
+    const sanitizedName = originalName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+      .replace(/\s+/g, '-') // Substitui espaços por hífens
+      .substring(0, 100); // Limita tamanho
+    
+    let fileName = `${sanitizedName}.${fileExtension}`;
+    let filePath = `addendums/${fileName}`;
+    
+    // Tentar upload, se houver duplicata, adicionar timestamp
+    let attempts = 0;
+    let uploadSuccess = false;
+    
+    while (attempts < 3 && !uploadSuccess) {
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || 'application/octet-stream'
+        });
 
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file);
+      if (!uploadError) {
+        uploadSuccess = true;
+        break;
+      }
 
-    if (uploadError) {
-      throw uploadError;
+      // Se for erro de duplicata e ainda houver tentativas, adicionar timestamp
+      if (uploadError.message.includes('duplicate') && attempts < 2) {
+        attempts++;
+        const timestamp = Date.now();
+        fileName = `${sanitizedName}_${timestamp}.${fileExtension}`;
+        filePath = `addendums/${fileName}`;
+        continue;
+      }
+
+      // Outros erros
+      if (uploadError) {
+        throw uploadError;
+      }
+    }
+
+    if (!uploadSuccess) {
+      throw new Error('Não foi possível fazer upload do arquivo após várias tentativas.');
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -97,7 +138,7 @@ export default function AddendumForm({ isOpen, onClose, onSave, addendum }: Adde
       .getPublicUrl(filePath);
 
     return {
-      name: file.name,
+      name: file.name, // Nome original para exibição no banco
       type: file.type,
       size: file.size,
       url: publicUrl
