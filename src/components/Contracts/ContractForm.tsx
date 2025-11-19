@@ -28,6 +28,7 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const { user } = useAuth(); // MOVER PARA AQUI - nível superior do componente
 
   useEffect(() => {
     if (contract) {
@@ -134,7 +135,8 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
     setError('');
 
     try {
-      const { user } = useAuth(); // Adicione isso no topo do componente se ainda não estiver
+      // Remover a linha: const { user } = useAuth(); // ❌ ERRADO
+      // Agora user já está disponível do hook no topo
       
       const contractData = {
         number: formData.number,
@@ -145,7 +147,7 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
         end_date: formatDateForDB(formData.endDate),
         status: formData.status,
         category: formData.category,
-        created_by: user?.id // Adicionar o ID do usuário que está criando
+        created_by: user?.id // ✅ Agora funciona corretamente
       };
 
       let contractId: string;
