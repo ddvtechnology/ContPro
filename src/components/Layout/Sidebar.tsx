@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { 
   Home, 
   FileText,
@@ -23,7 +23,9 @@ export default function Sidebar() {
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
       <div className="flex items-center justify-center h-20 px-3 border-b border-gray-200">
-        <img src="/ContPro.svg" alt="Logo" className="h-25 w-auto max-w-full object-contain" />
+        <Link to="/" className="cursor-pointer transition-opacity flex items-center justify-center">
+          <img src="/ContPro.svg" alt="Logo" className="h-48 w-auto max-w-full object-contain" />
+        </Link>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
