@@ -1,0 +1,8 @@
+nome,descricao,unidade,quantidade_inicial,estoque_minimo,valor_unitario
+Cimento Portland CP-II 50kg,Cimento para construção civil,sc,1000,100,35.50
+Areia Média,Areia para construção,m³,500,50,80.00
+Tijolo Cerâmico 8 furos,Tijolo para alvenaria,un,50000,5000,0.85
+Brita 1,Brita para concreto,m³,300,30,95.00
+Aço CA-50 10mm,Vergalhão para estrutura,kg,15000,1500,8.50
+
+
