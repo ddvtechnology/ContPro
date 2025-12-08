@@ -203,8 +203,6 @@ export default function DocumentForm({ isOpen, onClose, onSave, document }: Docu
         .substring(0, 100); // Limita tamanho
       
       const fileExtension = file.name.split('.').pop() || 'pdf';
-      const fileName = `${sanitizedName}.${fileExtension}`;
-      let filePath = `documents/${fileName}`;
 
       setUploadProgress(25);
 
@@ -215,12 +213,25 @@ export default function DocumentForm({ isOpen, onClose, onSave, document }: Docu
         throw new Error('Bucket "documents" não encontrado no momento do upload');
       }
 
-      // Upload do arquivo para o Supabase Storage
-      // Se o arquivo já existir, adicionar timestamp para tornar único
+      // Gerar nome único garantindo que não haja duplicatas
+      // Usar timestamp + número aleatório para garantir unicidade mesmo em uploads simultâneos
+      const generateUniqueFileName = (baseName: string, extension: string, attempt: number = 0): string => {
+        const timestamp = Date.now();
+        const randomSuffix = Math.floor(Math.random() * 1000000); // 0-999999
+        const uniqueSuffix = attempt > 0 ? `${timestamp}_${randomSuffix}_${attempt}` : `${timestamp}_${randomSuffix}`;
+        return `${baseName}_${uniqueSuffix}.${extension}`;
+      };
+
+      // Gerar nome único desde o início usando timestamp + random
+      // Isso garante que mesmo com múltiplos uploads simultâneos, os nomes serão únicos
+      let filePath = `documents/${generateUniqueFileName(sanitizedName, fileExtension)}`;
       let attempts = 0;
       let uploadSuccess = false;
+      const maxAttempts = 10; // Aumentar tentativas para garantir sucesso
 
-      while (attempts < 3 && !uploadSuccess) {
+      while (attempts < maxAttempts && !uploadSuccess) {
+        // Tentar upload diretamente
+        // O nome já é único devido ao timestamp + random, mas tratamos erros de duplicata como segurança
         const { error } = await supabase.storage
           .from('documents')
           .upload(filePath, file, {
@@ -234,11 +245,13 @@ export default function DocumentForm({ isOpen, onClose, onSave, document }: Docu
           break; // Upload bem-sucedido
         }
 
-        // Se for erro de duplicata e ainda houver tentativas, adicionar timestamp
-        if (error.message.includes('duplicate') && attempts < 2) {
+        // Se for erro de duplicata (improvável, mas possível em casos extremos), gerar novo nome único
+        if (error.message.includes('duplicate') || 
+            error.message.includes('already exists') || 
+            error.message.includes('The resource already exists')) {
           attempts++;
-          const timestamp = Date.now();
-          filePath = `documents/${sanitizedName}_${timestamp}.${fileExtension}`;
+          // Gerar novo nome com timestamp atualizado + random + número de tentativa
+          filePath = `documents/${generateUniqueFileName(sanitizedName, fileExtension, attempts)}`;
           continue;
         }
 
@@ -247,15 +260,13 @@ export default function DocumentForm({ isOpen, onClose, onSave, document }: Docu
           throw new Error('Sem permissão para upload. Verifique as políticas RLS do bucket.');
         } else if (error.message.includes('size')) {
           throw new Error('Arquivo muito grande para o bucket.');
-        } else if (error.message.includes('duplicate')) {
-          throw new Error('Arquivo com este nome já existe. Tente usar um nome diferente.');
         } else {
           throw new Error(`Erro no upload: ${error.message}`);
         }
       }
 
       if (!uploadSuccess) {
-        throw new Error('Não foi possível fazer upload do arquivo após várias tentativas.');
+        throw new Error('Não foi possível fazer upload do arquivo após várias tentativas. Tente novamente.');
       }
 
       setUploadProgress(75);

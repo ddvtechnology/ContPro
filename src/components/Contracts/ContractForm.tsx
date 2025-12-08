@@ -77,14 +77,25 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
       .replace(/\s+/g, '-') // Substitui espaços por hífens
       .substring(0, 100); // Limita tamanho
     
-    let fileName = `${sanitizedName}.${fileExtension}`;
-    let filePath = `contracts/${fileName}`;
+    // Gerar nome único garantindo que não haja duplicatas
+    // Usar timestamp + número aleatório para garantir unicidade mesmo em uploads simultâneos
+    const generateUniqueFileName = (baseName: string, extension: string, attempt: number = 0): string => {
+      const timestamp = Date.now();
+      const randomSuffix = Math.floor(Math.random() * 1000000); // 0-999999
+      const uniqueSuffix = attempt > 0 ? `${timestamp}_${randomSuffix}_${attempt}` : `${timestamp}_${randomSuffix}`;
+      return `${baseName}_${uniqueSuffix}.${extension}`;
+    };
     
-    // Tentar upload, se houver duplicata, adicionar timestamp
+    // Gerar nome único desde o início usando timestamp + random
+    // Isso garante que mesmo com múltiplos uploads simultâneos, os nomes serão únicos
+    let filePath = `contracts/${generateUniqueFileName(sanitizedName, fileExtension)}`;
     let attempts = 0;
     let uploadSuccess = false;
+    const maxAttempts = 10; // Aumentar tentativas para garantir sucesso
     
-    while (attempts < 3 && !uploadSuccess) {
+    while (attempts < maxAttempts && !uploadSuccess) {
+      // Tentar upload diretamente
+      // O nome já é único devido ao timestamp + random, mas tratamos erros de duplicata como segurança
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, file, {
@@ -98,12 +109,13 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
         break;
       }
 
-      // Se for erro de duplicata e ainda houver tentativas, adicionar timestamp
-      if (uploadError.message.includes('duplicate') && attempts < 2) {
+      // Se for erro de duplicata (improvável, mas possível em casos extremos), gerar novo nome único
+      if (uploadError.message.includes('duplicate') || 
+          uploadError.message.includes('already exists') || 
+          uploadError.message.includes('The resource already exists')) {
         attempts++;
-        const timestamp = Date.now();
-        fileName = `${sanitizedName}_${timestamp}.${fileExtension}`;
-        filePath = `contracts/${fileName}`;
+        // Gerar novo nome com timestamp atualizado + random + número de tentativa
+        filePath = `contracts/${generateUniqueFileName(sanitizedName, fileExtension, attempts)}`;
         continue;
       }
 
@@ -114,7 +126,7 @@ export default function ContractForm({ isOpen, onClose, onSave, contract }: Cont
     }
 
     if (!uploadSuccess) {
-      throw new Error('Não foi possível fazer upload do arquivo após várias tentativas.');
+      throw new Error('Não foi possível fazer upload do arquivo após várias tentativas. Tente novamente.');
     }
 
     const { data: { publicUrl } } = supabase.storage
