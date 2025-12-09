@@ -217,7 +217,7 @@ export default function DashboardPage() {
         type: 'warning',
         date: new Date(),
         read: false,
-        link: '/addendums'
+        link: '/addendums?filter=expiring'
       });
     }
 
@@ -508,7 +508,7 @@ export default function DashboardPage() {
             value={metrics.expiringAddendums}
             icon={AlertTriangle}
             color="red"
-            onClick={() => navigate('/addendums')}
+            onClick={() => navigate('/addendums?filter=expiring')}
           />
         )}
       </div>

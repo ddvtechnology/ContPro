@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, Eye, Edit2, Trash2, FileText, Calendar, DollarSign, Download, X, Clock, CheckSquare } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, FileText, Calendar, DollarSign, Download, X, Clock, CheckSquare, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { formatDateForDisplay } from '../../utils/dateUtils';
+import { formatDateForDisplay, parseDateFromDB } from '../../utils/dateUtils';
 import AddendumForm from './AddendumForm';
 import DeleteConfirmModal from '../Common/DeleteConfirmModal';
 import ContractSearchSelect from '../Common/ContractSearchSelect';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface Addendum {
   id: string;
@@ -37,6 +37,7 @@ export default function AddendumsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [contractFilter, setContractFilter] = useState<string>('');
+  const [expiringFilter, setExpiringFilter] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isFilesModalOpen, setIsFilesModalOpen] = useState(false);
@@ -45,6 +46,7 @@ export default function AddendumsPage() {
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [error, setError] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAddendums();
@@ -55,18 +57,26 @@ export default function AddendumsPage() {
   }, []);
 
   useEffect(() => {
-    // Verificar se há filtro de contrato na URL
+    // Verificar se há filtros na URL
     const urlParams = new URLSearchParams(location.search);
     const contractId = urlParams.get('contract');
+    const filter = urlParams.get('filter');
+    
     if (contractId) {
       setContractFilter(contractId);
+    }
+    
+    if (filter === 'expiring') {
+      setExpiringFilter(true);
+    } else {
+      setExpiringFilter(false);
     }
   }, [location.search]);
 
   // Limpar seleção quando filtros mudarem
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [searchTerm, typeFilter, contractFilter]);
+  }, [searchTerm, typeFilter, contractFilter, expiringFilter]);
 
   const fetchContracts = async () => {
     try {
@@ -175,7 +185,30 @@ export default function AddendumsPage() {
     const matchesType = typeFilter === 'all' || addendum.type === typeFilter;
     const matchesContract = !contractFilter || addendum.contract_id === contractFilter;
     
-    return matchesSearch && matchesType && matchesContract;
+    // Filtro de aditivos vencendo em 30 dias (apenas para tipos 'prazo' e 'vigencia')
+    let matchesExpiring = true;
+    if (expiringFilter) {
+      // Apenas aditivos de prazo e vigência podem vencer
+      if ((addendum.type === 'prazo' || addendum.type === 'vigencia') && addendum.new_end_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(today.getDate() + 30);
+        thirtyDaysFromNow.setHours(23, 59, 59, 999);
+        
+        const endDate = parseDateFromDB(addendum.new_end_date);
+        endDate.setHours(0, 0, 0, 0);
+        
+        // Verifica se vence ENTRE hoje e 30 dias
+        matchesExpiring = endDate >= today && endDate <= thirtyDaysFromNow;
+      } else {
+        // Se não for prazo/vigência ou não tiver data, não corresponde ao filtro
+        matchesExpiring = false;
+      }
+    }
+    
+    return matchesSearch && matchesType && matchesContract && matchesExpiring;
   });
 
   const getTypeColor = (type: Addendum['type']) => {
@@ -376,6 +409,79 @@ export default function AddendumsPage() {
             />
           </div>
         </div>
+        
+        {/* Filtros rápidos */}
+        <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              const newExpiringFilter = !expiringFilter;
+              setExpiringFilter(newExpiringFilter);
+              
+              const urlParams = new URLSearchParams(location.search);
+              if (newExpiringFilter) {
+                urlParams.set('filter', 'expiring');
+              } else {
+                urlParams.delete('filter');
+              }
+              
+              if (contractFilter) {
+                urlParams.set('contract', contractFilter);
+              } else {
+                urlParams.delete('contract');
+              }
+              
+              const newSearch = urlParams.toString();
+              navigate(`/addendums${newSearch ? `?${newSearch}` : ''}`, { replace: true });
+            }}
+            className={`inline-flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg text-xs sm:text-sm transition-colors ${
+              expiringFilter 
+                ? 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100' 
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <AlertTriangle className="h-3.5 sm:h-4 w-3.5 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Vencendo em 30 dias</span>
+            <span className="sm:hidden">30 dias</span>
+          </button>
+          
+          {(typeFilter !== 'all' || contractFilter || expiringFilter) && (
+            <button
+              onClick={() => {
+                setTypeFilter('all');
+                setContractFilter('');
+                setExpiringFilter(false);
+                navigate('/addendums', { replace: true });
+              }}
+              className="inline-flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <X className="h-3.5 sm:h-4 w-3.5 sm:w-4 mr-1 sm:mr-2" />
+              Limpar Filtros
+            </button>
+          )}
+        </div>
+        
+        {/* Indicador de filtro ativo */}
+        {(typeFilter !== 'all' || contractFilter || expiringFilter) && (
+          <div className="mt-3 sm:mt-4 bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3 flex items-center flex-wrap gap-2">
+            <span className="text-xs sm:text-sm font-medium text-blue-900">Filtros ativos:</span>
+            {expiringFilter && (
+              <span className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs">
+                <AlertTriangle className="h-2.5 sm:h-3 w-2.5 sm:w-3 mr-0.5 sm:mr-1" />
+                Vencendo em 30 dias
+              </span>
+            )}
+            {typeFilter !== 'all' && (
+              <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Tipo: {typeFilter === 'valor' ? 'Aditivo de Valor' : typeFilter === 'prazo' ? 'Aditivo de Prazo' : typeFilter === 'vigencia' ? 'Apostilamento de Vigência' : 'Apostilamento'}
+              </span>
+            )}
+            {contractFilter && (
+              <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                Contrato: {contracts.find(c => c.id === contractFilter)?.number || 'Selecionado'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bulk Actions Bar */}
