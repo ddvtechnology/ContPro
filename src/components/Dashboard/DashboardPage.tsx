@@ -79,7 +79,15 @@ export default function DashboardPage() {
       const [contractsResult, documentsResult, addendumsResult] = await Promise.all([
         supabase.from('contracts').select('id, number, contractor, status, value, end_date'),
         supabase.from('documents').select('id'),
-        supabase.from('addendums').select('id, type, new_end_date, date, contract_id').not('contract_id', 'is', null),
+        supabase.from('addendums').select(`
+          id, 
+          type, 
+          new_end_date, 
+          date, 
+          contract_id,
+          value,
+          contract:contracts(status)
+        `).not('contract_id', 'is', null),
       ]);
 
       const contracts = contractsResult.data || [];
@@ -129,6 +137,11 @@ export default function DashboardPage() {
         // Também sinaliza contratos ATIVOS que expiraram nos últimos 30 dias (atrasados)
         const isRecentlyExpired = contractEndDate < today && contractEndDate >= thirtyDaysAgo;
         return isUpcoming || isRecentlyExpired;
+      }).sort((a, b) => {
+        // Ordenar por data de vencimento: mais próximos primeiro
+        const dateA = parseDateFromDB(contractNewEndDatesMap[a.id] || a.end_date);
+        const dateB = parseDateFromDB(contractNewEndDatesMap[b.id] || b.end_date);
+        return dateA.getTime() - dateB.getTime();
       });
 
       const overdue = contracts.filter(contract => {
@@ -146,11 +159,35 @@ export default function DashboardPage() {
       // Calcular métricas
       const totalContracts = contracts.length;
       const activeContracts = contracts.filter(c => c.status === 'ativo').length;
-      const totalValue = contracts.reduce((sum, c) => sum + (c.value || 0), 0);
+      
+      // Valor total: soma dos valores dos contratos ativos + aditivos de valor de contratos ativos
+      const contractsValue = contracts
+        .filter(c => c.status === 'ativo')
+        .reduce((sum, c) => sum + (c.value || 0), 0);
+      
+      const addendumsValue = addendums
+        .filter((a: any) => {
+          if (a.type !== 'valor' || !a.value) return false;
+          // contract é um objeto único, não array
+          const contractStatus = a.contract && typeof a.contract === 'object' && !Array.isArray(a.contract) 
+            ? (a.contract as any).status 
+            : null;
+          return contractStatus === 'ativo';
+        })
+        .reduce((sum, a: any) => sum + (a.value || 0), 0);
+      
+      const totalValue = contractsValue + addendumsValue;
       const totalAddendums = addendums.length;
       
       // Calcular aditivos vencendo (aditivos de prazo e apostilamentos de vigência que vençam nos próximos 30 dias)
-      const expiringAddendumsCount = addendums.filter(addendum => {
+      // Apenas de contratos ativos
+      const expiringAddendumsCount = addendums.filter((addendum: any) => {
+        // Desconsiderar se o contrato não está ativo
+        const contractStatus = addendum.contract && typeof addendum.contract === 'object' && !Array.isArray(addendum.contract)
+          ? (addendum.contract as any).status
+          : null;
+        if (contractStatus !== 'ativo') return false;
+        
         if ((addendum.type !== 'prazo' && addendum.type !== 'vigencia') || !addendum.new_end_date) return false;
         
         const endDate = parseDateFromDB(addendum.new_end_date);

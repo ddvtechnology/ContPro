@@ -74,7 +74,7 @@ export default function ContractsPage() {
       
       const [contractsResult, addendumsResult] = await Promise.all([
         supabase.from('contracts').select('*').order('created_at', { ascending: false }),
-        supabase.from('addendums').select('contract_id, type, new_end_date, date')
+        supabase.from('addendums').select('contract_id, type, new_end_date, date, value')
       ]);
 
       if (contractsResult.error) throw contractsResult.error;
@@ -97,6 +97,7 @@ export default function ContractsPage() {
       // Contar aditivos por contrato
       const addendumsCount: {[key: string]: number} = {};
       const extensionsData: {[key: string]: any} = {};
+      const addendumsValueByContract: {[key: string]: number} = {};
       
       (addendumsResult.data || []).forEach(addendum => {
         if (addendum.contract_id) {
@@ -109,10 +110,22 @@ export default function ContractsPage() {
               addendumDate: addendum.date
             };
           }
+          
+          // Armazenar valor de aditivos de valor
+          if (addendum.type === 'valor' && addendum.value) {
+            addendumsValueByContract[addendum.contract_id] = 
+              (addendumsValueByContract[addendum.contract_id] || 0) + addendum.value;
+          }
         }
       });
 
-      setContracts(formattedContracts);
+      // Atualizar contratos com valor dos aditivos
+      const contractsWithAddendums = formattedContracts.map(contract => ({
+        ...contract,
+        totalValue: contract.value + (addendumsValueByContract[contract.id] || 0)
+      }));
+
+      setContracts(contractsWithAddendums);
       setContractAddendums(addendumsCount);
       setContractExtensions(extensionsData);
     } catch (error: any) {
@@ -276,61 +289,97 @@ export default function ContractsPage() {
         </div>
       )}
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Compactos para telas menores */}
       {contracts.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Total</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-blue-600 truncate">{contracts.length}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-1.5 sm:p-2.5">
+            <div className="flex items-center justify-between gap-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-gray-600">Total</p>
+                <p className="text-base sm:text-lg font-bold text-blue-600 truncate" title={`${contracts.length} contratos cadastrados`}>
+                  {contracts.length}
+                </p>
               </div>
-              <div className="bg-blue-100 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                <span className="text-blue-600 text-xs sm:text-sm font-medium">Contratos</span>
+              <div className="bg-blue-100 px-0.5 py-0 sm:px-1 sm:py-0 rounded flex-shrink-0">
+                <span className="text-blue-600 text-[9px] sm:text-xs font-medium leading-tight">Contratos</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Ativos</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-green-600 truncate">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-1.5 sm:p-2.5">
+            <div className="flex items-center justify-between gap-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-gray-600">Ativos</p>
+                <p 
+                  className="text-base sm:text-lg font-bold text-green-600 truncate" 
+                  title={`${contracts.filter(c => c.status === 'ativo').length} contratos ativos (${Math.round((contracts.filter(c => c.status === 'ativo').length / contracts.length) * 100)}%)`}
+                >
                   {contracts.filter(c => c.status === 'ativo').length}
                 </p>
               </div>
-              <div className="bg-green-100 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                <span className="text-green-600 text-xs sm:text-sm font-medium">
+              <div className="bg-green-100 px-0.5 py-0 sm:px-1 sm:py-0 rounded flex-shrink-0">
+                <span className="text-green-600 text-[9px] sm:text-xs font-medium leading-tight">
                   {Math.round((contracts.filter(c => c.status === 'ativo').length / contracts.length) * 100)}%
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Valor Total</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-purple-600 truncate">
-                  {formatCurrency(contracts.reduce((sum, c) => sum + c.value, 0))}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-1.5 sm:p-2.5 col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between gap-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-gray-600">Valor Total</p>
+                <p 
+                  className="text-sm sm:text-base font-bold text-purple-600 truncate" 
+                  title={`Valor total dos contratos ativos (incluindo aditivos): ${formatCurrency(
+                    contracts
+                      .filter(c => c.status === 'ativo')
+                      .reduce((sum, c) => sum + ((c as any).totalValue || c.value), 0)
+                  )}`}
+                >
+                  {formatCurrency(
+                    contracts
+                      .filter(c => c.status === 'ativo')
+                      .reduce((sum, c) => sum + ((c as any).totalValue || c.value), 0)
+                  )}
                 </p>
               </div>
-              <div className="bg-purple-100 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                <span className="text-purple-600 text-xs sm:text-sm font-medium">Total</span>
+              <div className="bg-purple-100 px-0.5 py-0 sm:px-1 sm:py-0 rounded flex-shrink-0">
+                <span className="text-purple-600 text-[9px] sm:text-xs font-medium leading-tight">+ Adit.</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0 pr-2">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Suspensos</p>
-                <p className="text-sm sm:text-lg lg:text-xl font-bold text-amber-600 truncate">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-1.5 sm:p-2.5">
+            <div className="flex items-center justify-between gap-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-gray-600">Suspensos</p>
+                <p 
+                  className="text-base sm:text-lg font-bold text-amber-600 truncate" 
+                  title={`${contracts.filter(c => c.status === 'suspenso').length} contratos suspensos`}
+                >
                   {contracts.filter(c => c.status === 'suspenso').length}
                 </p>
               </div>
-              <div className="bg-amber-100 p-2 sm:p-3 rounded-lg flex-shrink-0">
-                <span className="text-amber-600 text-xs sm:text-sm font-medium">Atenção</span>
+              <div className="bg-amber-100 px-0.5 py-0 sm:px-1 sm:py-0 rounded flex-shrink-0">
+                <span className="text-amber-600 text-[9px] sm:text-xs font-medium leading-tight">Atenção</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-1.5 sm:p-2.5">
+            <div className="flex items-center justify-between gap-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-gray-600">Encerrados</p>
+                <p 
+                  className="text-base sm:text-lg font-bold text-red-600 truncate" 
+                  title={`${contracts.filter(c => c.status === 'encerrado').length} contratos encerrados`}
+                >
+                  {contracts.filter(c => c.status === 'encerrado').length}
+                </p>
+              </div>
+              <div className="bg-red-100 px-0.5 py-0 sm:px-1 sm:py-0 rounded flex-shrink-0">
+                <span className="text-red-600 text-[9px] sm:text-xs font-medium leading-tight">Finaliz.</span>
               </div>
             </div>
           </div>

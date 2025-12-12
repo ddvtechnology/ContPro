@@ -545,12 +545,61 @@ export default function ImportContractsModal({ isOpen, onClose, onImportComplete
             return;
           }
 
+          // Buscar contratos existentes para verificar duplicatas
+          const { data: existingContracts, error: fetchError } = await supabase
+            .from('contracts')
+            .select('number');
+          
+          if (fetchError) {
+            setError('Erro ao verificar contratos existentes');
+            setIsUploading(false);
+            return;
+          }
+
+          const existingNumbers = new Set((existingContracts || []).map(c => c.number.trim().toLowerCase()));
+          
+          // Verificar duplicatas antes de inserir
+          const duplicateErrors: Array<{ row: number; error: string }> = [];
+          const validContracts: typeof contracts = [];
+          
+          contracts.forEach((contract, index) => {
+            const originalRowNumber = jsonData.findIndex((row: any, idx: number) => {
+              const normalizeKey = (key: string) => key.toLowerCase().trim();
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                normalizedRow[normalizeKey(key)] = row[key];
+              });
+              const numero = normalizedRow.numero || normalizedRow['número'] || normalizedRow.number;
+              return String(numero).trim() === contract.numero;
+            }) + 2;
+
+            if (existingNumbers.has(contract.numero.toLowerCase())) {
+              duplicateErrors.push({ 
+                row: originalRowNumber, 
+                error: `Número de contrato já existe no sistema: ${contract.numero}` 
+              });
+            } else {
+              validContracts.push(contract);
+            }
+          });
+
+          // Se houver duplicatas, mostrar erro e não importar
+          if (duplicateErrors.length > 0) {
+            setError(`${duplicateErrors.length} contrato(s) com número duplicado encontrado(s). Corrija e tente novamente.`);
+            setImportResult({ 
+              success: 0, 
+              errors: [...errors, ...duplicateErrors] 
+            });
+            setIsUploading(false);
+            return;
+          }
+
           // Inserir contratos no banco
           let successCount = 0;
           const insertErrors: Array<{ row: number; error: string }> = [];
 
-          for (let i = 0; i < contracts.length; i++) {
-            const contract = contracts[i];
+          for (let i = 0; i < validContracts.length; i++) {
+            const contract = validContracts[i];
             const originalRowNumber = jsonData.findIndex((row: any, idx: number) => {
               const normalizeKey = (key: string) => key.toLowerCase().trim();
               const normalizedRow: any = {};

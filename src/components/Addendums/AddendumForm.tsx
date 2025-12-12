@@ -408,7 +408,7 @@ export default function AddendumForm({ isOpen, onClose, onSave, addendum }: Adde
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar className="inline h-4 w-4 mr-1" />
-              Data do Aditivo
+              Data do Documento
             </label>
             <input
               type="date"
