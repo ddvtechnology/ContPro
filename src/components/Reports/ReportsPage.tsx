@@ -13,6 +13,7 @@ export default function ReportsPage() {
   const [contracts, setContracts] = useState<any[]>([]);
   const [addendums, setAddendums] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [contractAddendumDates, setContractAddendumDates] = useState<{[key: string]: string}>({});
   
   // Filtros avançados
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -46,6 +47,26 @@ export default function ReportsPage() {
       
       setContracts(contractsResult.data || []);
       setAddendums(addendumsResult.data || []);
+      
+      // Criar mapeamento do aditivo de prazo mais recente por contrato
+      const addendumDatesMap: {[key: string]: string} = {};
+      (addendumsResult.data || []).forEach(addendum => {
+        if ((addendum.type === 'prazo' || addendum.type === 'vigencia') && addendum.new_end_date && addendum.contract_id) {
+          // Se já existe uma data para este contrato, verificar qual é mais recente
+          if (!addendumDatesMap[addendum.contract_id]) {
+            addendumDatesMap[addendum.contract_id] = addendum.new_end_date;
+          } else {
+            // Comparar datas e manter a mais recente
+            const currentDate = parseDateFromDB(addendumDatesMap[addendum.contract_id]);
+            const newDate = parseDateFromDB(addendum.new_end_date);
+            if (newDate > currentDate) {
+              addendumDatesMap[addendum.contract_id] = addendum.new_end_date;
+            }
+          }
+        }
+      });
+      
+      setContractAddendumDates(addendumDatesMap);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
     } finally {
@@ -351,7 +372,13 @@ export default function ReportsPage() {
               } else if (key === 'startDate') {
                 row.push(contract.start_date ? formatDateForDisplay(contract.start_date) : '');
               } else if (key === 'endDate') {
-                row.push(contract.end_date ? formatDateForDisplay(contract.end_date) : '');
+                const endDateStr = contract.end_date ? formatDateForDisplay(contract.end_date) : '';
+                const mostRecentAddendumDate = contractAddendumDates[contract.id];
+                if (mostRecentAddendumDate) {
+                  row.push(`${endDateStr} | Aditivo de Prazo: ${formatDateForDisplay(mostRecentAddendumDate)}`);
+                } else {
+                  row.push(endDateStr);
+                }
               } else {
                 row.push(contract[col.key] || '');
               }
@@ -724,7 +751,14 @@ export default function ReportsPage() {
                   } else if (key === 'startDate') {
                     cellValue = `<td>${c.start_date ? formatDateForDisplay(c.start_date) : '-'}</td>`;
                   } else if (key === 'endDate') {
-                    cellValue = `<td>${c.end_date ? formatDateForDisplay(c.end_date) : '-'}</td>`;
+                    const mostRecentAddendumDate = contractAddendumDates[c.id];
+                    let endDateHtml = c.end_date ? formatDateForDisplay(c.end_date) : '-';
+                    if (mostRecentAddendumDate) {
+                      const addendumDateHtml = `<div style="color: #2563eb; font-size: 9pt; margin-top: 2px;">⏰ Aditivo de Prazo: ${formatDateForDisplay(mostRecentAddendumDate)}</div>`;
+                      cellValue = `<td><div>${endDateHtml}</div>${addendumDateHtml}</td>`;
+                    } else {
+                      cellValue = `<td>${endDateHtml}</td>`;
+                    }
                   } else {
                     cellValue = `<td>${(c[col.key] || '').toString().substring(0, 100)}</td>`;
                   }
@@ -1356,9 +1390,17 @@ export default function ReportsPage() {
                               </td>
                             );
                           } else if (key === 'endDate') {
+                            const mostRecentAddendumDate = contractAddendumDates[contract.id];
                             return (
                               <td key={key} className="px-2 py-1.5 text-xs text-gray-600">
-                                {contract.end_date ? formatDateForDisplay(contract.end_date) : '-'}
+                                <div>
+                                  <div>{contract.end_date ? formatDateForDisplay(contract.end_date) : '-'}</div>
+                                  {mostRecentAddendumDate && (
+                                    <div className="mt-1 text-[10px] text-blue-600 font-medium">
+                                      ⏰ Aditivo: {formatDateForDisplay(mostRecentAddendumDate)}
+                                    </div>
+                                  )}
+                                </div>
                               </td>
                             );
                           } else {
@@ -1412,6 +1454,11 @@ export default function ReportsPage() {
                     <div className="text-xs text-gray-600">
                       <div>Início: {contract.start_date ? formatDateForDisplay(contract.start_date) : '-'}</div>
                       <div>Fim: {contract.end_date ? formatDateForDisplay(contract.end_date) : '-'}</div>
+                      {contractAddendumDates[contract.id] && (
+                        <div className="mt-1 text-xs text-blue-600 font-medium">
+                          ⏰ Aditivo de Prazo: {formatDateForDisplay(contractAddendumDates[contract.id])}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

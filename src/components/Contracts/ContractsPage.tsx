@@ -103,12 +103,25 @@ export default function ContractsPage() {
         if (addendum.contract_id) {
           addendumsCount[addendum.contract_id] = (addendumsCount[addendum.contract_id] || 0) + 1;
           
-          // Armazenar informações de aditivos de prazo
-          if (addendum.type === 'prazo' && addendum.new_end_date) {
-            extensionsData[addendum.contract_id] = {
-              newEndDate: addendum.new_end_date,
-              addendumDate: addendum.date
-            };
+          // Armazenar informações de aditivos de prazo e vigência (sempre pegar o mais recente)
+          if ((addendum.type === 'prazo' || addendum.type === 'vigencia') && addendum.new_end_date) {
+            // Se já existe uma data para este contrato, verificar qual é mais recente
+            if (!extensionsData[addendum.contract_id]) {
+              extensionsData[addendum.contract_id] = {
+                newEndDate: addendum.new_end_date,
+                addendumDate: addendum.date
+              };
+            } else {
+              // Comparar datas e manter a mais recente
+              const currentDate = parseDateFromDB(extensionsData[addendum.contract_id].newEndDate);
+              const newDate = parseDateFromDB(addendum.new_end_date);
+              if (newDate > currentDate) {
+                extensionsData[addendum.contract_id] = {
+                  newEndDate: addendum.new_end_date,
+                  addendumDate: addendum.date
+                };
+              }
+            }
           }
           
           // Armazenar valor de aditivos de valor
