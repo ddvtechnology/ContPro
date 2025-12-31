@@ -37,10 +37,10 @@ export default function ContractItemsPage() {
     if (selectedContract) {
       loadItems(selectedContract);
     } else {
-      setItems([]); // Não carregar itens quando não há contrato selecionado
+      setItems([]);  // Não carregar itens quando não há contrato selecionado
       setLoading(false);
     }
-    setSelectedIds(new Set()); // Limpar seleção ao mudar contrato
+    setSelectedIds(new Set());  // Limpar seleção ao mudar contrato
   }, [selectedContract]);
 
   const loadContracts = async () => {
@@ -74,7 +74,6 @@ export default function ContractItemsPage() {
       setLoading(false);
     }
   };
-
 
   const handleDeleteItem = async () => {
     if (!deleteModal.itemId) return;
@@ -170,11 +169,13 @@ export default function ContractItemsPage() {
     return 'OK';
   };
 
+  const selectedContractData = contracts.find(c => c.id === selectedContract);
+
   const exportToPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const contractInfo = selectedContractData 
+    const contractInfo = selectedContractData
       ? `
         <div class="info-box">
           <h3>Informações do Contrato</h3>
@@ -220,15 +221,29 @@ export default function ContractItemsPage() {
               padding-bottom: 15px;
               margin-bottom: 20px;
             }
+            .header-top {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 16px;
+            }
             .header h1 {
               color: #1e40af;
               font-size: 22pt;
               font-weight: bold;
               margin-bottom: 5px;
             }
+            .header-logo {
+              position: absolute;
+              buttom: 60px;           /* ajusta conforme quiser */
+              right: 10px;         /* canto direito; use left:0 se quiser à esquerda */
+              height: 200px;     /* altura visual da logo */
+              width: auto;
+            }
             .header .subtitle {
               color: #666;
               font-size: 11pt;
+              margin-top: 4px;
             }
             .info-box {
               background: #f8f9fa;
@@ -313,8 +328,13 @@ export default function ContractItemsPage() {
         </head>
         <body>
           <div class="header">
-            <h1>📦 Controle de Itens dos Contratos</h1>
-            <p class="subtitle">Relatório gerado em ${formatDateForDisplay(new Date())}</p>
+            <div class="header-top">
+              <div>
+                <h1>📦 Controle de Itens dos Contratos</h1>
+                <p class="subtitle">Relatório gerado em ${formatDateForDisplay(new Date())}</p>
+              </div>
+              <img src="/ContPro.svg" alt="ContPro Logo" class="header-logo" />
+            </div>
           </div>
 
           ${contractInfo}
@@ -353,20 +373,20 @@ export default function ContractItemsPage() {
             </thead>
             <tbody>
               ${filteredItems.map(item => {
-                const status = getStockStatus(item);
-                const usedPercentage = item.initialQuantity > 0 
-                  ? ((item.initialQuantity - item.currentQuantity) / item.initialQuantity * 100).toFixed(1)
-                  : '0.0';
-                const statusClass = `status-${status}`;
-                const statusText = getStockStatusText(item);
-                
-                let contractInfo = '';
-                if (!selectedContractData) {
-                  const contract = contracts.find(c => c.id === item.contractId);
-                  contractInfo = `<td>${contract?.number || 'N/A'}</td>`;
-                }
+      const status = getStockStatus(item);
+      const usedPercentage = item.initialQuantity > 0
+        ? ((item.initialQuantity - item.currentQuantity) / item.initialQuantity * 100).toFixed(1)
+        : '0.0';
+      const statusClass = `status-${status}`;
+      const statusText = getStockStatusText(item);
 
-                return `
+      let contractInfo = '';
+      if (!selectedContractData) {
+        const contract = contracts.find(c => c.id === item.contractId);
+        contractInfo = `<td>${contract?.number || 'N/A'}</td>`;
+      }
+
+      return `
                   <tr>
                     <td>
                       <strong>${item.name}</strong>
@@ -381,12 +401,12 @@ export default function ContractItemsPage() {
                     ${contractInfo}
                   </tr>
                 `;
-              }).join('')}
+    }).join('')}
             </tbody>
           </table>
 
           <div class="footer">
-            <p>Sistema de Gestão de Contratos - Relatório gerado automaticamente</p>
+            <p>ContPro - Sistema de Gestão de Contratos</p>
             <p>${new Date().toLocaleString('pt-BR')}</p>
           </div>
         </body>
@@ -395,22 +415,19 @@ export default function ContractItemsPage() {
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-    
-    // Aguardar carregar e imprimir/exportar
+// Aguardar carregar e imprimir/exportar
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print();
       }, 250);
     };
   };
-
-  const selectedContractData = contracts.find(c => c.id === selectedContract);
-
+const selectedContractData = contracts.find(c => c.id === selectedContract);
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+          <h1 className="text-2xl font-bold text-gray-900">
             Controle de Itens dos Contratos
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -538,7 +555,7 @@ export default function ContractItemsPage() {
             <Package className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum item encontrado</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {selectedContract 
+              {selectedContract
                 ? 'Comece adicionando um novo item para este contrato.'
                 : 'Selecione um contrato para visualizar seus itens.'}
             </p>
@@ -584,9 +601,11 @@ export default function ContractItemsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredItems.map((item) => {
                   const status = getStockStatus(item);
-                  const usedPercentage = ((item.initialQuantity - item.currentQuantity) / item.initialQuantity * 100).toFixed(1);
+                  const usedPercentage = item.initialQuantity
+                    ? ((item.initialQuantity - item.currentQuantity) / item.initialQuantity * 100).toFixed(1)
+                    : '0.0';
                   const isSelected = selectedIds.has(item.id);
-                  
+
                   return (
                     <tr key={item.id} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
                       <td className="px-6 py-4">
@@ -758,4 +777,3 @@ export default function ContractItemsPage() {
     </div>
   );
 }
-
